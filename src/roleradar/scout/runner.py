@@ -275,8 +275,8 @@ async def _phase_report(state: RunState, *, notify: bool, digest: bool) -> None:
         return
     state.phase = "reporting"
     try:
-        from app.config import settings
-        from app.services.scout import notify as notify_mod
+        from roleradar.notify import digest as notify_mod
+        from roleradar.settings import settings
 
         rows = await database.db.list_listings(limit=1000)
         recent = notify_mod.listings_since(rows, hours=FRESH_LISTING_HOURS)
@@ -368,25 +368,18 @@ async def _phase_advise(state: RunState) -> None:
 
 async def run_scout(
     *,
-    draft_cap: int | None = None,
-    max_draft_seconds: float | None = None,
-    buckets: list[str] | None = None,
     enrich: bool = True,
     enrich_limit: int = 200,
-    respect_backlog_window: bool = True,
     notify: bool = True,
     digest: bool = True,
     state: RunState | None = None,
 ) -> RunState:
-    """Execute one full run. ``draft_cap=None`` drains the queue."""
+    """Execute one full run: fetch, store, enrich, advise, report."""
     state = state or RunState(run_id=str(uuid4()), started_at=_now())
     try:
         await _phase_fetch_and_store(state)
         if enrich:
             await _phase_enrich(state, limit=enrich_limit)
-        # Automated drafting is deliberately not run. Scout's product is now
-        # job information and application advice; resumes are tailored on
-        # demand through the interactive path when the user chooses to.
         await _phase_advise(state)
         await _phase_report(state, notify=notify, digest=digest)
         state.phase = "done"

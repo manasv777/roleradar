@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import create_engine, event, func, select, update
 from sqlalchemy.engine import Engine
@@ -27,7 +28,7 @@ from sqlalchemy.ext.asyncio import (
 from roleradar.models import Base, Listing, Source
 
 
-def _utcnow_iso() -> str:
+def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 

@@ -9,6 +9,7 @@ lexically and returned to clients verbatim, and SQLite has no date type anyway.
 """
 
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -124,3 +125,7 @@ class Listing(Base):
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False)
     first_seen_at: Mapped[str] = mapped_column(String, default=_utcnow_iso)
     last_seen_at: Mapped[str] = mapped_column(String, default=_utcnow_iso)
+    # The feed record exactly as received. This is what makes reclassification
+    # possible without refetching: when the taxonomy changes, every stored row
+    # can be re-judged from its original payload.
+    raw_record: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
