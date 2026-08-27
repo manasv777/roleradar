@@ -1,0 +1,10 @@
+roleradar
+Copyright 2026 the roleradar authors
+
+This product includes software developed as part of Resume-Matcher
+(https://github.com/srbhr/Resume-Matcher), Copyright the Resume-Matcher
+authors, licensed under the Apache License, Version 2.0.
+
+Portions of the job-source fetching, normalization, and ATS enrichment code in
+this project are derived from that work and have been modified. See LICENSING.md
+for details on how roleradar treats upstream job-listing feeds.

@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------------------
+# Local runtime data. roleradar stores every listing it fetches in a local
+# SQLite DB, plus the user's own preferences and dated digests. None of it
+# belongs in the repo.
+# ---------------------------------------------------------------------------
+data/**
+!data/.gitkeep
+*.bak
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Environment and secrets
+.env*
+!.env.example
+
+# Databases
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
