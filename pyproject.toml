@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "roleradar"
+version = "0.1.0"
+description = "Scout internship and new-grad roles across job boards and company career sites, filtered to the fields you care about."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+
+# Deliberately small. roleradar makes no LLM calls, so there is no provider
+# SDK, no tokenizer, and no key-encryption dependency here. Keep it that way:
+# tests/test_no_llm.py fails the build if an LLM client is ever imported.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Chromium is ~150MB. Job-description rendering degrades gracefully without it,
+# so it is opt-in rather than a precondition for running the app at all.
+render = ["playwright>=1.45"]
+dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "respx>=0.21", "ruff>=0.5"]
+
+[project.scripts]
+roleradar = "roleradar.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/roleradar"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# Live tests hit real job boards; they are for checking a source has not been
+# renamed or deleted, not for CI.
+addopts = "-m 'not live'"
+markers = [
+    "live: hits real network endpoints (run manually, never in CI)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
