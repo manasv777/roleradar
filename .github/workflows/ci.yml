@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Feeds named after a season get renamed or archived. A weekly check is the
+    # difference between a maintained project and one that looks broken to
+    # every new user.
+    - cron: "0 12 * * 1"
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: No hardcoded seasons
+        # An AST parse, not a grep: the check has to tell a season used as a
+        # value apart from one named in a docstring explaining the rule.
+        run: python scripts/check_no_hardcoded_seasons.py
+
+      - name: No local paths or private-fork residue
+        # Deliberately generic. An earlier version of this check listed the
+        # maintainer's surname as a grep pattern, which published in the guard
+        # exactly the string the guard existed to keep out. What actually
+        # matters is structural: absolute home paths, and filenames that only
+        # exist in the private repo this code was extracted from.
+        run: |
+          if grep -rnE '/(Users|home)/[a-z0-9_.-]+/' \
+               --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.next \
+               --exclude-dir=.venv --exclude='ci.yml' . ; then
+            echo "::error::absolute home path committed"
+            exit 1
+          fi
+          if grep -rniE 'master_merge|resume_matcher\.db|merged_profile' \
+               --exclude-dir=.git --exclude='ci.yml' . ; then
+            echo "::error::private-fork artefact committed"
+            exit 1
+          fi
+          echo "no local paths or fork residue"
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run build
+
+  sources:
+    # Live network: only on the weekly cron, never gating a pull request.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e "."
+      - run: roleradar sources --strict
