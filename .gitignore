@@ -40,3 +40,8 @@ next-env.d.ts
 Thumbs.db
 .idea/
 .vscode/
+
+# Next.js build output lives under apps/web
+apps/web/.next/
+apps/web/node_modules/
+apps/web/next-env.d.ts
