@@ -69,7 +69,7 @@ class Listing(Base):
     __tablename__ = "listings"
     __table_args__ = (
         UniqueConstraint("source_id", "external_id", name="uq_scout_listing_source_external"),
-        Index("ix_listings_bucket_active", "bucket", "active"),
+        Index("ix_listings_term_active", "term_id", "active"),
         Index("ix_listings_fingerprint", "fingerprint"),
     )
 
@@ -100,15 +100,20 @@ class Listing(Base):
     date_posted: Mapped[str | None] = mapped_column(String, nullable=True)
     date_updated: Mapped[str | None] = mapped_column(String, nullable=True)
 
-    # spring_2027 | summer_2027 | fall_2026_no_auth | None
-    bucket: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
-    bucket_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    # Computed from the calendar, e.g. "summer_2027". Null is legitimate: a
+    # new-grad posting has no academic term.
+    term_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    # internship | new_grad | unknown
+    role_type: Mapped[str] = mapped_column(String, default="unknown", index=True)
+    classify_confidence: Mapped[float] = mapped_column(Float, default=0.0)
     # Human-readable rule trace, surfaced in the UI so a decision is auditable.
-    bucket_reasons: Mapped[list] = mapped_column(JSON, default=list)
-    track: Mapped[str | None] = mapped_column(String, nullable=True)
-    # Always True for work-authorization-sensitive buckets. Part of the API
-    # contract, not just a UI concern - the classifier is a heuristic and must
-    # never present itself as authoritative.
+    classify_reasons: Mapped[list] = mapped_column(JSON, default=list)
+    # Which taxonomy version judged this row, so `reclassify` knows what is stale.
+    taxonomy_version: Mapped[int] = mapped_column(Integer, default=0)
+    # Null unless the user needs sponsorship; scoring is skipped otherwise.
+    work_auth_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Part of the API contract, not just a UI concern - the classifier is a
+    # heuristic and must never present itself as authoritative.
     needs_verification: Mapped[bool] = mapped_column(Boolean, default=False)
 
     deadline: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -129,3 +134,24 @@ class Listing(Base):
     # possible without refetching: when the taxonomy changes, every stored row
     # can be re-judged from its original payload.
     raw_record: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class ListingLabel(Base):
+    """One (kind, value) label on a listing - domain or specialty.
+
+    A join table rather than a JSON column on `listings`: filtering by
+    specialty is the main query the UI makes, and a JSON array cannot be
+    indexed. Rows are replaced wholesale whenever a listing is reclassified.
+    """
+
+    __tablename__ = "listing_labels"
+    __table_args__ = (
+        UniqueConstraint("listing_id", "kind", "value", name="uq_listing_label"),
+        Index("ix_listing_labels_kind_value", "kind", "value"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    listing_id: Mapped[str] = mapped_column(String, index=True)
+    # "domain" | "specialty"
+    kind: Mapped[str] = mapped_column(String)
+    value: Mapped[str] = mapped_column(String)

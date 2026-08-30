@@ -29,6 +29,8 @@ from typing import Any
 from uuid import uuid4
 
 from roleradar import db as database
+from roleradar.prefs import load_prefs
+from roleradar.taxonomy import load_taxonomy
 from roleradar.scout import advise as advise_mod
 from roleradar.scout import enrich as enrich_mod
 from roleradar.scout.sources import SOURCES, build_client, fetch_source
@@ -118,6 +120,11 @@ def _now() -> str:
 
 async def _phase_fetch_and_store(state: RunState) -> None:
     """Fetch every enabled feed, classify, and persist the in-scope subset."""
+    # Loaded once per run: the taxonomy compiles regexes, and re-reading
+    # preferences per record would let them change mid-run.
+    prefs = load_prefs()
+    taxonomy = load_taxonomy()
+    horizon = prefs.horizon()
     state.phase = "fetching"
     source_state = await load_source_state()
     totals = UpsertStats()
@@ -142,7 +149,10 @@ async def _phase_fetch_and_store(state: RunState) -> None:
             if result.status == "ok":
                 state.sources_ok += 1
                 state.phase = "classifying"
-                stats = await upsert_records(result.records, spec.source_id)
+                stats = await upsert_records(
+                    result.records, spec.source_id,
+                    prefs=prefs, taxonomy=taxonomy, horizon=horizon,
+                )
                 totals.merge(stats)
                 await save_source_state(result, spec, record_count=result.raw_count)
             elif result.status == "not_modified":

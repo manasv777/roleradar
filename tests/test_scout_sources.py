@@ -177,7 +177,9 @@ class TestFetchSource:
         route = respx.get(FEED_URL).mock(return_value=httpx.Response(200, json=[]))
         await fetch_source(SPEC, client=client)
 
-        assert "resume-matcher-scout" in route.calls.last.request.headers["User-Agent"]
+        # These feeds are volunteer-run; identifying the client honestly is
+        # the least a polling tool owes them.
+        assert "roleradar" in route.calls.last.request.headers["User-Agent"]
 
 
 class TestFetchAll:

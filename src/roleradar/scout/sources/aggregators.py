@@ -31,7 +31,7 @@ from roleradar.scout.normalize import (
 logger = logging.getLogger(__name__)
 
 # Identifies us to feed operators so a misbehaving client can be traced back.
-USER_AGENT = "resume-matcher-scout/1.0 (personal job-search tool)"
+USER_AGENT = "roleradar/0.1 (personal job-search tool; +https://github.com/roleradar)"
 
 # Polite pause between requests to distinct hosts.
 INTER_REQUEST_DELAY_SECONDS = 1.0

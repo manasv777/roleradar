@@ -8,10 +8,32 @@ rather than deleted, because drafts still reference it.
 
 import pytest
 
+from datetime import date
+
+from roleradar.prefs import Preferences
 from roleradar.scout.normalize import ScoutRecord
-from roleradar.scout.store import upsert_listing, upsert_records
+from roleradar.scout.store import upsert_listing as _upsert_listing
+from roleradar.scout.store import upsert_records as _upsert_records
+from roleradar.taxonomy import load_taxonomy
+from roleradar.terms import horizon_terms
 
 pytestmark = pytest.mark.unit
+
+TAXONOMY = load_taxonomy()
+HORIZON = horizon_terms(date(2026, 8, 29))
+
+
+async def upsert_listing(record, *, prefs: Preferences | None = None):
+    """Classification context is per-run, not per-record; tests supply defaults."""
+    return await _upsert_listing(
+        record, prefs=prefs or Preferences(), taxonomy=TAXONOMY, horizon=HORIZON
+    )
+
+
+async def upsert_records(records, source_id, *, prefs: Preferences | None = None):
+    return await _upsert_records(
+        records, source_id, prefs=prefs or Preferences(), taxonomy=TAXONOMY, horizon=HORIZON
+    )
 
 
 def rec(**kwargs: object) -> ScoutRecord:
@@ -35,25 +57,59 @@ class TestUpsertCreate:
         assert outcome == "created" and listing_id
 
         row = await isolated_db.get_listing(listing_id)
-        assert row["bucket"] == "spring_2027"
-        assert row["track"] == "swe"
+        assert row["term_id"] == "spring_2027"
+        assert row["role_type"] == "internship"
         assert row["ats_vendor"] == "greenhouse" and row["ats_tenant"] == "acme"
-        assert row["bucket_reasons"], "the bucket decision must be auditable"
+        assert row["classify_reasons"], "the classification must be auditable"
 
-    async def test_out_of_scope_record_is_never_persisted(self, isolated_db) -> None:
-        """Only the filtered shortlist is stored — never the upstream corpus."""
-        listing_id, outcome = await upsert_listing(rec(terms=["Summer 2025"]))
+    async def test_a_listing_outside_the_horizon_is_still_stored(self, isolated_db) -> None:
+        """INVERSION. The original asserted this row was discarded, on the
+        grounds that only the filtered shortlist should ever be stored.
+
+        That is what made widening your interests require refetching the world:
+        a listing dropped at ingest cannot be recovered by reclassifying. It is
+        stored now, unlabelled, and filtered at query time instead.
+        """
+        listing_id, outcome = await upsert_listing(rec(terms=["Summer 2019"]))
+        assert outcome == "created"
+        assert listing_id is not None
+
+        row = await isolated_db.get_listing(listing_id)
+        assert row["term_id"] is None                 # genuinely outside the horizon
+        assert row["role_type"] == "internship"       # but still a real internship
+        assert row["active"] is True                  # and still open upstream
+
+    async def test_a_non_engineering_listing_is_not_stored(self, isolated_db) -> None:
+        """Store-everything is not store-anything: a sales role is still noise."""
+        listing_id, outcome = await upsert_listing(rec(title="Sales Development Intern"))
         assert (listing_id, outcome) == (None, "skipped")
         assert await isolated_db.count_listings() == 0
 
-    async def test_no_auth_bucket_persists_the_verification_flag(
+    async def test_work_auth_is_scored_only_when_the_user_needs_it(
         self, isolated_db
     ) -> None:
+        """INVERSION. The original folded work authorization into the term
+        itself, producing a `fall_2026_no_auth` bucket for one person's visa
+        situation. Term and authorization are separate facts now, and the
+        second is only computed when the user says they need sponsorship."""
+        from roleradar.prefs import Preferences, WorkAuth
+
+        record = rec(terms=["Fall 2026"], locations=["Toronto, ON, Canada"])
+
+        listing_id, _ = await upsert_listing(record)
+        row = await isolated_db.get_listing(listing_id)
+        assert row["term_id"] == "fall_2026"          # the term, and only the term
+        assert row["work_auth_score"] is None
+        assert row["needs_verification"] is False
+
+        sponsored = Preferences(work_auth=WorkAuth(requires_sponsorship=True))
         listing_id, _ = await upsert_listing(
-            rec(terms=["Fall 2026"], locations=["Toronto, ON, Canada"])
+            rec(external_id="x2", terms=["Fall 2026"],
+                locations=["Toronto, ON, Canada"]),
+            prefs=sponsored,
         )
         row = await isolated_db.get_listing(listing_id)
-        assert row["bucket"] == "fall_2026_no_auth"
+        assert row["work_auth_score"] is not None
         assert row["needs_verification"] is True
 
 
@@ -74,7 +130,7 @@ class TestChangeDetection:
             rec(terms=["Summer 2027"], date_updated="2026-08-09T00:00:00+00:00")
         )
         assert outcome == "updated"
-        assert (await isolated_db.get_listing(listing_id))["bucket"] == "summer_2027"
+        assert (await isolated_db.get_listing(listing_id))["term_id"] == "summer_2027"
 
     async def test_closing_upstream_is_an_update(self, isolated_db) -> None:
         listing_id, _ = await upsert_listing(rec())
@@ -104,20 +160,28 @@ class TestStatePreservation:
 
         assert (await isolated_db.get_listing(listing_id))["dismissed"] is True
 
-    async def test_falling_out_of_scope_retires_rather_than_deletes(
+    async def test_no_longer_matching_a_filter_does_not_retire_a_listing(
         self, isolated_db
     ) -> None:
+        """INVERSION. The original set active=False when a listing stopped
+        matching the user's fields, calling it "retired".
+
+        That conflated two unrelated facts. `active` means "still listed
+        upstream", and mark_listings_inactive is its only owner. A listing that
+        no longer matches your interests is a query concern - it is still a real,
+        open job, and flipping `active` would make it invisible to everyone,
+        including a user who later widens their fields.
+        """
         listing_id, _ = await upsert_listing(rec())
-        _, outcome = await upsert_listing(
-            rec(terms=["Summer 2025"], date_updated="2026-08-09T00:00:00+00:00")
+
+        # Re-parse the same listing with a term far outside the horizon.
+        await upsert_listing(
+            rec(terms=["Summer 2019"], date_updated="2026-08-09T00:00:00+00:00")
         )
-        assert outcome == "updated"
 
         row = await isolated_db.get_listing(listing_id)
-        assert row is not None, "rows are never hard-deleted"
-        assert row["active"] is False
-        assert any("retired" in r for r in row["bucket_reasons"])
-
+        assert row["active"] is True, "still open upstream, so still active"
+        assert row["term_id"] is None, "but no longer placed in the horizon"
 
 class TestCrossSourceDedupe:
     async def test_same_role_from_another_feed_corroborates(self, isolated_db) -> None:
@@ -131,7 +195,7 @@ class TestCrossSourceDedupe:
         assert await isolated_db.count_listings() == 1
 
         row = await isolated_db.get_listing(first_id)
-        assert any("corroborated by zshah_intern" in r for r in row["bucket_reasons"])
+        assert any("corroborated by zshah_intern" in r for r in row["classify_reasons"])
 
     async def test_corroboration_survives_tracking_param_differences(
         self, isolated_db
@@ -165,16 +229,16 @@ class TestCrossSourceDedupe:
                 "company": "Acme",
                 "title": "Software Engineer Intern",
                 "apply_url": "https://boards.greenhouse.io/acme/jobs/1",
-                "bucket": None,
-                "bucket_confidence": 0.0,
-                "bucket_reasons": ["no term signal"],
+                "term_id": None,
+                "classify_confidence": 0.0,
+                "classify_reasons": ["no term signal"],
             }
         )
         _, outcome = await upsert_listing(rec())
         assert outcome == "corroborated"
 
         row = await isolated_db.get_listing(seeded["listing_id"])
-        assert row["bucket"] == "spring_2027"
+        assert row["term_id"] == "spring_2027"
 
     async def test_different_roles_do_not_collapse(self, isolated_db) -> None:
         await upsert_listing(rec())
@@ -201,8 +265,11 @@ class TestUpsertRecords:
             ],
             "simplify_intern",
         )
-        assert stats.created == 2
-        assert stats.skipped_out_of_scope == 1
+        # INVERSION: the third row is outside the term horizon. The original
+        # counted it as skipped_out_of_scope; it is now stored unlabelled.
+        assert stats.created == 3
+        assert stats.skipped_out_of_scope == 0
+        assert stats.errors == 0
 
     async def test_vanished_listing_is_retired_not_deleted(self, isolated_db) -> None:
         await upsert_records(

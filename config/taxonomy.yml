@@ -1,0 +1,162 @@
+# Career fields roleradar can match against, as domain -> specialty.
+#
+# This file is meant to be edited. Add a specialty, run `roleradar reclassify`,
+# and every listing already stored is re-judged against it - no refetch, because
+# each row keeps the raw feed record it came from.
+#
+# Matching is MULTI-LABEL on purpose. An "ML Infrastructure Engineer Intern" is
+# genuinely both ai_ml/ml_engineering and software/devops; forcing one label
+# means one of them is wrong.
+#
+# Precedence when classifying:
+#   1. global_exclude on the title  -> not an engineering role at all
+#   2. feed_categories exact match  -> the feed already told us the domain
+#   3. title_any regex              -> specialty within a domain
+#   4. domain matched, no specialty -> specialty "other"
+#   5. nothing matched              -> stored unlabelled, still filterable
+version: 1
+
+# Titles that are never engineering roles, whatever the feed's category says.
+global_exclude:
+  title_any:
+    - 'sales'
+    - 'recruit\w*'
+    - 'marketing'
+    - 'account executive'
+    - 'customer success'
+    - 'technical writer'
+    - 'community manager'
+    - 'human resources'
+    - 'talent acquisition'
+
+domains:
+  - id: software
+    label: Software Engineering
+    feed_categories: ['software', 'software engineering']
+    specialties:
+      - id: backend
+        label: Backend
+        title_any: ['backend', 'back-end', 'server[- ]side', 'distributed systems', 'platform engineer', 'api engineer']
+        skills: [python, java, go, postgresql, grpc, redis, microservices]
+      - id: frontend
+        label: Frontend
+        title_any: ['frontend', 'front-end', 'web (developer|engineer)', 'ui engineer', '\breact\b']
+        skills: [typescript, react, css, next.js, accessibility]
+      - id: fullstack
+        label: Full Stack
+        title_any: ['full[- ]?stack']
+        skills: [typescript, python, react, postgresql]
+      - id: mobile
+        label: Mobile
+        title_any: ['\bios\b', 'android', 'mobile (engineer|developer)', 'swift', 'kotlin']
+        skills: [swift, kotlin, react native]
+      - id: embedded
+        label: Embedded / Systems
+        title_any: ['embedded', 'firmware', 'systems (software|engineer)', 'kernel', '\brtos\b']
+        skills: [c, c++, rust, rtos]
+      - id: devops
+        label: DevOps / Infrastructure
+        title_any: ['devops', '\bsre\b', 'site reliability', 'infrastructure', 'cloud engineer', 'platform engineer']
+        skills: [terraform, kubernetes, aws, docker, ci/cd, linux]
+
+  - id: data
+    label: Data
+    feed_categories: ['data', 'data engineering']
+    specialties:
+      - id: data_science
+        label: Data Science
+        title_any: ['data scien(ce|tist)', 'statistic(s|ian)', 'experimentation']
+        skills: [python, pandas, statistics, sql, experimentation]
+      - id: data_engineering
+        label: Data Engineering
+        title_any: ['data engineer', '\betl\b', 'data platform', 'analytics engineer', 'data pipeline']
+        skills: [spark, airflow, sql, dbt, kafka]
+      - id: analytics
+        label: Analytics
+        title_any: ['data analyst', 'business intelligence', '\bbi\b analyst', 'analytics analyst', 'business analyst']
+        skills: [sql, tableau, excel, looker]
+
+  - id: ai_ml
+    label: AI / ML
+    feed_categories: ['ai/ml/data', 'data science, ai & machine learning', 'data & ml/ai', 'machine learning']
+    specialties:
+      - id: ml_engineering
+        label: ML Engineering
+        title_any: ['machine learning engineer', '\bml\b (engineer|infra|platform)', 'mlops', 'applied (scientist|ml)']
+        skills: [pytorch, tensorflow, python, kubernetes, mlops]
+      - id: research
+        label: Research
+        title_any: ['research (scientist|intern|engineer)', '\bphd\b']
+        skills: [pytorch, jax, research]
+      - id: nlp
+        label: NLP / LLM
+        title_any: ['\bnlp\b', 'natural language', '\bllm\b', 'language model']
+        skills: [transformers, pytorch, nlp]
+      - id: computer_vision
+        label: Computer Vision
+        title_any: ['computer vision', '\bcv\b engineer', 'perception', 'image processing']
+        skills: [opencv, pytorch, computer vision]
+
+  - id: security
+    label: Security
+    feed_categories: ['security', 'cybersecurity']
+    specialties:
+      - id: appsec
+        label: Application Security
+        title_any: ['appsec', 'application security', 'product security']
+        skills: [threat modeling, sast, cryptography]
+      - id: offensive
+        label: Offensive Security
+        title_any: ['red team', 'penetration test', 'offensive security']
+        skills: [pentesting, burp, exploitation]
+      - id: security_eng
+        label: Security Engineering
+        title_any: ['security engineer', '\bsoc\b', 'detection engineer', 'cryptograph']
+        skills: [siem, detection, cryptography]
+
+  - id: hardware
+    label: Hardware
+    feed_categories: ['hardware', 'electrical engineering']
+    specialties:
+      - id: asic_fpga
+        label: ASIC / FPGA
+        title_any: ['\basic\b', '\bfpga\b', '\brtl\b', 'verilog', 'physical design']
+        skills: [verilog, vhdl, systemverilog]
+      - id: analog
+        label: Analog / Circuits
+        title_any: ['analog', 'circuit design', '\bpcb\b', 'signal integrity']
+        skills: [spice, pcb, circuit design]
+      - id: hw_test
+        label: Validation / Test
+        title_any: ['hardware (test|validation)', '\bdft\b', 'post[- ]silicon']
+        skills: [validation, test automation]
+
+  - id: quant
+    label: Quant / Finance
+    feed_categories: ['quant', 'quantitative finance']
+    specialties:
+      - id: quant_research
+        label: Quant Research
+        title_any: ['quantitative research', '\bquant\b research', 'quantitative analyst']
+        skills: [python, statistics, stochastic calculus]
+      - id: quant_dev
+        label: Quant Developer
+        title_any: ['quant(itative)? (developer|engineer)', 'low latency', 'trading systems']
+        skills: [c++, python, low latency]
+      - id: trading
+        label: Trading
+        title_any: ['\btrader\b', 'trading intern', 'market mak']
+        skills: [probability, mental math]
+
+  - id: product
+    label: Product / Design
+    feed_categories: ['product', 'design', 'product management']
+    specialties:
+      - id: product_management
+        label: Product Management
+        title_any: ['product manager', '\bpm\b intern', 'associate product']
+        skills: [product strategy, analytics]
+      - id: design
+        label: Design
+        title_any: ['\bux\b', '\bui\b designer', 'product design', 'user research']
+        skills: [figma, prototyping]

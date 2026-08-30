@@ -30,17 +30,16 @@ def listing(**kwargs) -> dict:
         "listing_id": "l1",
         "company": "Acme",
         "title": "SWE Intern",
-        "bucket": "spring_2027",
-        "bucket_confidence": 0.95,
-        "ats_score": 0.8,
+        "term_id": "spring_2027",
+        "role_type": "internship",
+        "classify_confidence": 0.95,
         "apply_url": "https://example.test/apply",
         "active": True,
         "dismissed": False,
         "needs_verification": False,
         "deadline": None,
         "deadline_source": "unknown",
-        "draft_status": "none",
-        "first_seen_at": datetime.now(timezone.utc).isoformat(),
+                "first_seen_at": datetime.now(timezone.utc).isoformat(),
     }
     base.update(kwargs)
     return base
@@ -49,14 +48,14 @@ def listing(**kwargs) -> dict:
 class TestSelection:
     def test_low_confidence_does_not_interrupt(self) -> None:
         """A notification for everything is a notification for nothing."""
-        assert select_notifiable([listing(bucket_confidence=0.3)]) == []
+        assert select_notifiable([listing(classify_confidence=0.3)]) == []
 
     def test_dismissed_and_inactive_are_excluded(self) -> None:
         assert select_notifiable([listing(dismissed=True)]) == []
         assert select_notifiable([listing(active=False)]) == []
 
     def test_unclassified_is_excluded(self) -> None:
-        assert select_notifiable([listing(bucket=None)]) == []
+        assert select_notifiable([listing(term_id=None, role_type="unknown")]) == []
 
     def test_capped_so_a_first_sync_cannot_spam(self) -> None:
         many = [listing(listing_id=f"l{i}") for i in range(50)]
@@ -64,13 +63,13 @@ class TestSelection:
 
     def test_best_candidates_come_first(self) -> None:
         rows = [
-            listing(listing_id="low", bucket_confidence=0.75, ats_score=0.1),
-            listing(listing_id="high", bucket_confidence=0.98, ats_score=0.9),
+            listing(listing_id="low", classify_confidence=0.75, ats_score=0.1),
+            listing(listing_id="high", classify_confidence=0.98, ats_score=0.9),
         ]
         assert select_notifiable(rows)[0]["listing_id"] == "high"
 
     def test_threshold_boundary_is_inclusive(self) -> None:
-        assert select_notifiable([listing(bucket_confidence=NOTIFY_CONFIDENCE_THRESHOLD)])
+        assert select_notifiable([listing(classify_confidence=NOTIFY_CONFIDENCE_THRESHOLD)])
 
 
 class TestNotifying:
@@ -93,7 +92,7 @@ class TestNotifying:
             return_value=True,
         ) as send:
             await notify_new_listings(
-                [listing(bucket="fall_2026_no_auth", needs_verification=True)]
+                [listing(term_id="fall_2026_no_auth", needs_verification=True)]
             )
         assert "verify work auth" in send.call_args.kwargs["message"]
 
@@ -129,7 +128,7 @@ class TestNotifying:
 class TestDigest:
     def test_groups_by_bucket_with_counts(self) -> None:
         out = render_digest(
-            [listing(listing_id="a"), listing(listing_id="b", bucket="summer_2027")],
+            [listing(listing_id="a"), listing(listing_id="b", term_id="summer_2027")],
             generated_at="2026-08-17T08:00:00+00:00",
         )
         assert "spring_2027 (1)" in out and "summer_2027 (1)" in out
@@ -148,7 +147,7 @@ class TestDigest:
 
     def test_work_auth_caveat_is_rendered_for_that_bucket(self) -> None:
         out = render_digest(
-            [listing(bucket="fall_2026_no_auth", needs_verification=True)],
+            [listing(term_id="fall_2026_no_auth", needs_verification=True)],
             generated_at="now",
         )
         assert "inferred, not verified" in out

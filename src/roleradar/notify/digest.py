@@ -83,14 +83,17 @@ def select_notifiable(listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     candidates = [
         row
         for row in listings
-        if row.get("bucket")
+        # Parenthesised deliberately: `or` binds looser than `and`, so without
+        # these brackets any classified row skipped the dismissed/active and
+        # confidence checks entirely.
+        if (row.get("term_id") or row.get("role_type") != "unknown")
         and not row.get("dismissed")
         and row.get("active", True)
-        and float(row.get("bucket_confidence") or 0.0) >= NOTIFY_CONFIDENCE_THRESHOLD
+        and float(row.get("classify_confidence") or 0.0) >= NOTIFY_CONFIDENCE_THRESHOLD
     ]
     candidates.sort(
         key=lambda r: (
-            -float(r.get("bucket_confidence") or 0.0),
+            -float(r.get("classify_confidence") or 0.0),
             -float(r.get("ats_score") or 0.0),
         )
     )
@@ -109,12 +112,12 @@ async def notify_new_listings(listings: list[dict[str, Any]]) -> int:
         ok = await send_notification(
             title=f"New: {row.get('company', 'Unknown')}",
             subtitle=str(row.get("title", ""))[:80],
-            message=f"{row.get('bucket', '')}{caveat} — apply early",
+            message=f"{row.get('term_id') or row.get('role_type', '')}{caveat} — apply early",
         )
         sent += int(ok)
 
     overflow = len(
-        [r for r in listings if float(r.get("bucket_confidence") or 0.0) >= NOTIFY_CONFIDENCE_THRESHOLD]
+        [r for r in listings if float(r.get("classify_confidence") or 0.0) >= NOTIFY_CONFIDENCE_THRESHOLD]
     ) - len(selected)
     if overflow > 0:
         await send_notification(
@@ -148,7 +151,7 @@ def render_digest(listings: list[dict[str, Any]], *, generated_at: str) -> str:
 
     by_bucket: dict[str, list[dict[str, Any]]] = {}
     for row in listings:
-        by_bucket.setdefault(row.get("bucket") or "unclassified", []).append(row)
+        by_bucket.setdefault(row.get("term_id") or "unclassified", []).append(row)
 
     lines += [f"**{len(listings)} new listing(s)** across {len(by_bucket)} bucket(s).", ""]
 
@@ -156,7 +159,7 @@ def render_digest(listings: list[dict[str, Any]], *, generated_at: str) -> str:
         rows = sorted(
             by_bucket[bucket],
             key=lambda r: (
-                -float(r.get("bucket_confidence") or 0.0),
+                -float(r.get("classify_confidence") or 0.0),
                 -float(r.get("ats_score") or 0.0),
             ),
         )

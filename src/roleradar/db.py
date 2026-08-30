@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import create_engine, event, func, select, update
+from sqlalchemy import create_engine, delete, event, func, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from roleradar.models import Base, Listing, Source
+from roleradar.models import Base, Listing, ListingLabel, Source
 
 
 def _now() -> str:
@@ -54,10 +54,12 @@ _SCOUT_LISTING_MUTABLE_FIELDS = frozenset(
         "degrees",
         "date_posted",
         "date_updated",
-        "bucket",
-        "bucket_confidence",
-        "bucket_reasons",
-        "track",
+        "term_id",
+        "role_type",
+        "classify_confidence",
+        "classify_reasons",
+        "taxonomy_version",
+        "work_auth_score",
         "needs_verification",
         "deadline",
         "deadline_source",
@@ -102,6 +104,52 @@ def make_sync_engine(path: Path) -> Engine:
 def init_models_sync(engine: Engine) -> None:
     """Create all tables. Idempotent."""
     Base.metadata.create_all(engine)
+
+
+
+def _apply_listing_filters(
+    stmt,
+    *,
+    term_id: str | None,
+    role_type: str | None,
+    domain: str | None,
+    specialty: str | None,
+    min_confidence: float,
+    include_dismissed: bool,
+    include_inactive: bool,
+):
+    """The one place listing filters are expressed.
+
+    Shared by `list_listings` and `count_listings` so the two can never drift -
+    a count that disagrees with its list is what produces empty pages.
+    """
+    if term_id is not None:
+        stmt = stmt.where(Listing.term_id == term_id)
+    if role_type is not None:
+        stmt = stmt.where(Listing.role_type == role_type)
+    if domain is not None:
+        stmt = stmt.where(
+            Listing.listing_id.in_(
+                select(ListingLabel.listing_id).where(
+                    ListingLabel.kind == "domain", ListingLabel.value == domain
+                )
+            )
+        )
+    if specialty is not None:
+        stmt = stmt.where(
+            Listing.listing_id.in_(
+                select(ListingLabel.listing_id).where(
+                    ListingLabel.kind == "specialty", ListingLabel.value == specialty
+                )
+            )
+        )
+    if min_confidence > 0.0:
+        stmt = stmt.where(Listing.classify_confidence >= min_confidence)
+    if not include_dismissed:
+        stmt = stmt.where(Listing.dismissed.is_(False))
+    if not include_inactive:
+        stmt = stmt.where(Listing.active.is_(True))
+    return stmt
 
 
 class Database:
@@ -172,10 +220,12 @@ class Database:
             "degrees": row.degrees or [],
             "date_posted": row.date_posted,
             "date_updated": row.date_updated,
-            "bucket": row.bucket,
-            "bucket_confidence": row.bucket_confidence,
-            "bucket_reasons": row.bucket_reasons or [],
-            "track": row.track,
+            "term_id": row.term_id,
+            "role_type": row.role_type,
+            "classify_confidence": row.classify_confidence,
+            "classify_reasons": row.classify_reasons or [],
+            "taxonomy_version": row.taxonomy_version,
+            "work_auth_score": row.work_auth_score,
             "needs_verification": row.needs_verification,
             "deadline": row.deadline,
             "deadline_source": row.deadline_source,
@@ -299,49 +349,112 @@ class Database:
     async def list_listings(
         self,
         *,
-        bucket: str | None = None,
-        track: str | None = None,
+        term_id: str | None = None,
+        role_type: str | None = None,
+        domain: str | None = None,
+        specialty: str | None = None,
         min_confidence: float = 0.0,
         include_dismissed: bool = False,
         include_inactive: bool = False,
         limit: int = 200,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """Query listings, newest and most-confident first."""
+        """Query listings, most confident first."""
         async with self._session() as session:
             stmt = select(Listing)
-            if bucket is not None:
-                stmt = stmt.where(Listing.bucket == bucket)
-            if track is not None:
-                stmt = stmt.where(Listing.track == track)
-            if min_confidence > 0.0:
-                stmt = stmt.where(Listing.bucket_confidence >= min_confidence)
-            if not include_dismissed:
-                stmt = stmt.where(Listing.dismissed.is_(False))
-            if not include_inactive:
-                stmt = stmt.where(Listing.active.is_(True))
-            stmt = stmt.order_by(
-                Listing.bucket_confidence.desc(),
-                Listing.date_posted.desc(),
-                Listing.first_seen_at.desc(),
-            ).limit(limit).offset(offset)
+            stmt = _apply_listing_filters(
+                stmt,
+                term_id=term_id,
+                role_type=role_type,
+                domain=domain,
+                specialty=specialty,
+                min_confidence=min_confidence,
+                include_dismissed=include_dismissed,
+                include_inactive=include_inactive,
+            )
+            stmt = (
+                stmt.order_by(
+                    Listing.classify_confidence.desc(),
+                    Listing.date_posted.desc(),
+                    Listing.first_seen_at.desc(),
+                )
+                .limit(limit)
+                .offset(offset)
+            )
             result = await session.execute(stmt)
             return [self._listing_to_dict(row) for row in result.scalars().all()]
 
     async def count_listings(
-        self, *, bucket: str | None = None, include_dismissed: bool = False
+        self,
+        *,
+        term_id: str | None = None,
+        role_type: str | None = None,
+        domain: str | None = None,
+        specialty: str | None = None,
+        min_confidence: float = 0.0,
+        include_dismissed: bool = False,
+        include_inactive: bool = False,
     ) -> int:
-        """Count active listings, optionally within one bucket."""
+        """Count listings matching exactly the filters ``list_listings`` takes.
+
+        The filter sets are kept identical deliberately. This count drives
+        pagination, and a counter that ignored, say, `specialty` would report a
+        total for the whole corpus and hand the UI page numbers that lead to
+        empty pages.
+        """
         async with self._session() as session:
-            stmt = select(func.count()).select_from(Listing).where(
-                Listing.active.is_(True)
+            stmt = select(func.count()).select_from(Listing)
+            stmt = _apply_listing_filters(
+                stmt,
+                term_id=term_id,
+                role_type=role_type,
+                domain=domain,
+                specialty=specialty,
+                min_confidence=min_confidence,
+                include_dismissed=include_dismissed,
+                include_inactive=include_inactive,
             )
-            if bucket is not None:
-                stmt = stmt.where(Listing.bucket == bucket)
-            if not include_dismissed:
-                stmt = stmt.where(Listing.dismissed.is_(False))
             result = await session.execute(stmt)
             return int(result.scalar() or 0)
+
+    async def set_labels(self, listing_id: str, labels: dict[str, list[str]]) -> None:
+        """Replace a listing's labels wholesale.
+
+        Replacement rather than merge: reclassification must be able to *remove*
+        a label the taxonomy no longer assigns, or edits to taxonomy.yml could
+        only ever add.
+        """
+        async with self._session() as session:
+            async with session.begin():
+                await session.execute(
+                    delete(ListingLabel).where(ListingLabel.listing_id == listing_id)
+                )
+                session.add_all(
+                    ListingLabel(listing_id=listing_id, kind=kind, value=value)
+                    for kind, values in labels.items()
+                    for value in dict.fromkeys(values)
+                )
+
+    async def get_labels(self, listing_id: str) -> dict[str, list[str]]:
+        async with self._session() as session:
+            result = await session.execute(
+                select(ListingLabel).where(ListingLabel.listing_id == listing_id)
+            )
+            out: dict[str, list[str]] = {}
+            for row in result.scalars().all():
+                out.setdefault(row.kind, []).append(row.value)
+            return out
+
+    async def distinct_labels(self, kind: str) -> list[str]:
+        """Every label value in use, for building filter menus."""
+        async with self._session() as session:
+            result = await session.execute(
+                select(ListingLabel.value)
+                .where(ListingLabel.kind == kind)
+                .distinct()
+                .order_by(ListingLabel.value)
+            )
+            return [v for (v,) in result.all()]
 
     async def mark_listings_inactive(
         self, source_id: str, seen_external_ids: set[str]

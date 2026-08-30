@@ -16,7 +16,6 @@ posting that asks for "machine learning".
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone

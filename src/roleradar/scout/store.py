@@ -17,7 +17,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from roleradar import db as database
+from roleradar.prefs import Preferences
 from roleradar.scout.classify import Verdict, classify
+from roleradar.taxonomy import Taxonomy
+from roleradar.terms import Term
 from roleradar.scout.normalize import ScoutRecord, detect_ats, fingerprint
 from roleradar.scout.sources import FetchResult, SourceSpec
 
@@ -34,6 +37,9 @@ class UpsertStats:
     corroborated: int = 0
     skipped_out_of_scope: int = 0
     deactivated: int = 0
+    # Rows that raised. Counted separately from skips so a broken feed cannot
+    # masquerade as a quiet one.
+    errors: int = 0
 
     def merge(self, other: "UpsertStats") -> None:
         self.created += other.created
@@ -42,6 +48,7 @@ class UpsertStats:
         self.corroborated += other.corroborated
         self.skipped_out_of_scope += other.skipped_out_of_scope
         self.deactivated += other.deactivated
+        self.errors += other.errors
 
 
 async def load_source_state() -> dict[str, dict[str, Any]]:
@@ -100,10 +107,11 @@ def _derived_columns(record: ScoutRecord, verdict: Verdict) -> dict[str, Any]:
         "degrees": record.degrees,
         "date_posted": record.date_posted,
         "date_updated": record.date_updated,
-        "bucket": verdict.bucket,
-        "bucket_confidence": verdict.confidence,
-        "bucket_reasons": verdict.reasons,
-        "track": verdict.track,
+        "term_id": verdict.term_id,
+        "role_type": verdict.role_type,
+        "classify_confidence": verdict.confidence,
+        "classify_reasons": verdict.reasons,
+        "work_auth_score": verdict.work_auth_score,
         "needs_verification": verdict.needs_verification,
         "active": record.active,
         "raw_record": record.raw,
@@ -121,27 +129,29 @@ async def _corroborate(
     (vanshb03 has no year, for instance), but never creates a second row.
     """
     updates: dict[str, Any] = {}
-    reasons = list(existing.get("bucket_reasons") or [])
+    reasons = list(existing.get("classify_reasons") or [])
     note = f"corroborated by {record.source_id}"
 
     if note not in reasons:
         reasons.append(note)
-        updates["bucket_reasons"] = reasons
+        updates["classify_reasons"] = reasons
 
-    # A source that CAN classify beats one that cannot.
-    if verdict.bucket and not existing.get("bucket"):
+    # A source that CAN place the term beats one that cannot. vanshb03 emits a
+    # season with no year, so a feed that names the year fills a real gap.
+    if verdict.term_id and not existing.get("term_id"):
         updates.update(
-            bucket=verdict.bucket,
-            bucket_confidence=verdict.confidence,
-            track=verdict.track,
+            term_id=verdict.term_id,
+            classify_confidence=verdict.confidence,
+            role_type=verdict.role_type,
             needs_verification=verdict.needs_verification,
-            bucket_reasons=reasons + list(verdict.reasons),
+            classify_reasons=reasons + list(verdict.reasons),
         )
-    elif verdict.bucket and verdict.bucket == existing.get("bucket"):
-        # Independent agreement on the same bucket is genuine evidence.
-        boosted = min(1.0, float(existing.get("bucket_confidence") or 0.0) + 0.05)
-        if boosted > float(existing.get("bucket_confidence") or 0.0):
-            updates["bucket_confidence"] = boosted
+    elif verdict.term_id and verdict.term_id == existing.get("term_id"):
+        # Independent agreement on the same term is genuine evidence.
+        current = float(existing.get("classify_confidence") or 0.0)
+        boosted = min(1.0, current + 0.05)
+        if boosted > current:
+            updates["classify_confidence"] = boosted
 
     # Fill gaps the primary source left blank.
     for field in ("sponsorship", "company_url"):
@@ -156,21 +166,50 @@ async def _corroborate(
     return True
 
 
-async def upsert_listing(record: ScoutRecord) -> tuple[str | None, str]:
+def _worth_storing(verdict: Verdict, scope: str) -> bool:
+    """Whether a labelled record is worth a row.
+
+    `store_scope` is a knob rather than a constant because the tradeoff is real:
+
+    * ``all``      - keep everything a feed publishes.
+    * ``taxonomy`` - keep anything that looks like an early-career technical
+      role, whether or not it matches the user's current interests. This is the
+      default, and it is what makes widening your fields a reclassification
+      rather than a re-fetch.
+    * ``selected`` - keep only what matches the interests set today. Smallest
+      database, but adding a field later cannot recover what was never stored.
+    """
+    if verdict.excluded:
+        return False
+    if scope == "all":
+        return True
+    if scope == "selected":
+        return bool(verdict.domains)
+    return bool(verdict.domains) or verdict.role_type != "unknown"
+
+
+async def upsert_listing(
+    record: ScoutRecord,
+    *,
+    prefs: Preferences,
+    taxonomy: Taxonomy,
+    horizon: list[Term],
+) -> tuple[str | None, str]:
     """Classify and persist one record.
 
     Returns ``(listing_id, outcome)`` where outcome is one of ``created``,
     ``updated``, ``unchanged``, ``corroborated``, or ``skipped``.
     """
-    verdict = classify(record)
+    verdict = classify(record, prefs=prefs, taxonomy=taxonomy, horizon=horizon)
 
     existing = await database.db.get_listing_by_external(record.source_id, record.external_id)
 
     if existing is None:
-        if verdict.bucket is None:
-            # Out of scope: never persisted. This keeps the database small and
-            # is also the licensing posture — only the filtered shortlist is
-            # stored, never the upstream corpus.
+        if not _worth_storing(verdict, prefs.store_scope):
+            # Not an early-career technical role at all. Note this is a much
+            # narrower test than the original, which dropped anything outside
+            # the user's current fields - that is precisely what made adding an
+            # interest later require refetching the world.
             return (None, "skipped")
 
         if not record.active:
@@ -190,7 +229,12 @@ async def upsert_listing(record: ScoutRecord) -> tuple[str | None, str]:
 
         columns = _derived_columns(record, verdict)
         columns.update(source_id=record.source_id, external_id=record.external_id)
+        columns["taxonomy_version"] = taxonomy.version
         created = await database.db.create_listing(columns)
+        await database.db.set_labels(
+            created["listing_id"],
+            {"domain": verdict.domains, "specialty": verdict.specialties},
+        )
         return (created["listing_id"], "created")
 
     listing_id = existing["listing_id"]
@@ -217,33 +261,43 @@ async def upsert_listing(record: ScoutRecord) -> tuple[str | None, str]:
     if existing.get("dismissed"):
         updates.pop("dismissed", None)
 
-    # A listing that already went out of scope on re-classification is retired,
-    # not deleted — its draft and tracker card still point at it.
-    if verdict.bucket is None:
-        updates["active"] = False
-        updates["bucket_reasons"] = list(verdict.reasons) + [
-            "no longer in scope on re-classification; retired"
-        ]
-        updates.pop("bucket", None)
+    # Deliberately absent: the original retired a listing that no longer matched
+    # the user's fields by setting active=False. That conflated two different
+    # things. `active` means "still listed upstream" and mark_listings_inactive
+    # is its only owner; no longer matching a filter is a query concern, not a
+    # lifecycle event.
 
+    updates["taxonomy_version"] = taxonomy.version
     await database.db.update_listing(listing_id, updates)
+    await database.db.set_labels(
+        listing_id, {"domain": verdict.domains, "specialty": verdict.specialties}
+    )
     return (listing_id, "updated")
 
 
-async def upsert_records(records: list[ScoutRecord], source_id: str) -> UpsertStats:
-    """Upsert every record from one source and retire the ones that vanished."""
+async def upsert_records(
+    records: list[ScoutRecord],
+    source_id: str,
+    *,
+    prefs: Preferences,
+    taxonomy: Taxonomy,
+    horizon: list[Term],
+) -> UpsertStats:
+    """Persist a whole feed, isolating per-record failures."""
     stats = UpsertStats()
     seen: set[str] = set()
 
     for record in records:
         seen.add(record.external_id)
         try:
-            _, outcome = await upsert_listing(record)
-        except Exception as exc:  # noqa: BLE001 - one bad row must not kill a run
-            logger.warning(
-                "Scout upsert failed for %s/%s: %s", source_id, record.external_id, exc
+            _, outcome = await upsert_listing(
+                record, prefs=prefs, taxonomy=taxonomy, horizon=horizon
             )
+        except Exception as exc:  # noqa: BLE001 - one bad row cannot end a feed
+            logger.warning("upsert failed for %s/%s: %s", source_id, record.external_id, exc)
+            stats.errors += 1
             continue
+
         if outcome == "created":
             stats.created += 1
         elif outcome == "updated":
@@ -252,8 +306,13 @@ async def upsert_records(records: list[ScoutRecord], source_id: str) -> UpsertSt
             stats.corroborated += 1
         elif outcome == "unchanged":
             stats.unchanged += 1
-        else:
+        elif outcome == "skipped":
             stats.skipped_out_of_scope += 1
+        else:
+            # An unrecognised outcome is a bug, not a silent skip. The original
+            # folded this into the skip counter, which hid it.
+            logger.warning("unknown upsert outcome %r for %s", outcome, record.external_id)
+            stats.errors += 1
 
     stats.deactivated = await database.db.mark_listings_inactive(source_id, seen)
     return stats
