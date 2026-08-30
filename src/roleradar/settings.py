@@ -38,7 +38,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ROLERADAR_", extra="ignore")
 
     host: str = "127.0.0.1"
-    port: int = 8000
+    # Not 8000: that port is contested on any machine with another API on it,
+    # and a health check answered by somebody else's server is worse than no
+    # health check at all.
+    port: int = 8100
     log_level: str = "INFO"
 
     @property
