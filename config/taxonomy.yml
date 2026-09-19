@@ -14,7 +14,7 @@
 #   3. title_any regex              -> specialty within a domain
 #   4. domain matched, no specialty -> specialty "other"
 #   5. nothing matched              -> stored unlabelled, still filterable
-version: 1
+version: 2
 
 # Titles that are never engineering roles, whatever the feed's category says.
 global_exclude:
@@ -61,7 +61,10 @@ domains:
 
   - id: data
     label: Data
-    feed_categories: ['data', 'data engineering']
+    # The last four are how the full-time search boards (Himalayas, Jobicy)
+    # spell their categories once hyphens are normalised.
+    feed_categories: ['data', 'data engineering', 'big data development',
+                      'big data developer', 'big data engineering', 'data science & analytics']
     specialties:
       - id: data_science
         label: Data Science
@@ -69,8 +72,9 @@ domains:
         skills: [python, pandas, statistics, sql, experimentation]
       - id: data_engineering
         label: Data Engineering
-        title_any: ['data engineer', '\betl\b', 'data platform', 'analytics engineer', 'data pipeline']
-        skills: [spark, airflow, sql, dbt, kafka]
+        title_any: ['data engineer', '\betl\b', 'data platform', 'analytics engineer', 'data pipeline',
+                    'hadoop', 'big ?data', '\bspark\b', '\bhive\b', '\bhdfs\b', 'mapreduce']
+        skills: [spark, airflow, sql, dbt, kafka, hadoop, hive, hdfs, scala]
       - id: analytics
         label: Analytics
         title_any: ['data analyst', 'business intelligence', '\bbi\b analyst', 'analytics analyst', 'business analyst']

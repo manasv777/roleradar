@@ -16,6 +16,7 @@ import pytest
 
 from roleradar.prefs import Preferences, WorkAuth
 from roleradar.scout.classify import (
+    ROLE_FULL_TIME,
     ROLE_INTERNSHIP,
     ROLE_NEW_GRAD,
     ROLE_UNKNOWN,
@@ -85,8 +86,12 @@ class TestRoleType:
             ("New Grad Software Engineer", ROLE_NEW_GRAD),
             ("Software Engineer, University Graduate", ROLE_NEW_GRAD),
             ("Entry-Level Backend Developer", ROLE_NEW_GRAD),
-            ("Senior Staff Engineer", ROLE_UNKNOWN),
-            ("Principal Architect", ROLE_UNKNOWN),
+            # INVERSION: these were ROLE_UNKNOWN while the tool only served
+            # early-career searches. A senior title is a full-time role, and
+            # with full-time roles selectable, "unknown" would hide them.
+            ("Senior Staff Engineer", ROLE_FULL_TIME),
+            ("Principal Architect", ROLE_FULL_TIME),
+            ("Software Engineer", ROLE_UNKNOWN),
         ],
     )
     def test_titles(self, title: str, expected: str) -> None:
@@ -99,6 +104,10 @@ class TestRoleType:
         )
         assert role == ROLE_NEW_GRAD
         assert any("source declares" in r for r in reasons)
+
+    def test_a_declared_full_time_role_is_respected(self) -> None:
+        role, _ = classify_role_type("Hadoop Developer", source_role_type=ROLE_FULL_TIME)
+        assert role == ROLE_FULL_TIME
 
     def test_a_term_implies_an_internship(self) -> None:
         assert classify_role_type("Software Engineer", has_term=True)[0] == ROLE_INTERNSHIP

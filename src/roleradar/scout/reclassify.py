@@ -9,6 +9,7 @@ the next scheduled run, and nothing lost because it was discarded months ago.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 
 from roleradar import db as database
 from roleradar.prefs import load_prefs
@@ -23,13 +24,45 @@ __all__ = ["reclassify_all"]
 _BATCH = 500
 
 
+def _spec_for(source_id: str):
+    """The SourceSpec a stored row came from, including preference-built ones."""
+    from roleradar.scout.normalize import normalize_himalayas, normalize_jobicy
+    from roleradar.scout.sources import SOURCES_BY_ID
+
+    if source_id in SOURCES_BY_ID:
+        return SOURCES_BY_ID[source_id]
+    prefix = source_id.split(":", 1)[0]
+    normalizer = {"himalayas": normalize_himalayas, "jobicy": normalize_jobicy}.get(prefix)
+    if normalizer is None:
+        return None
+    from roleradar.scout.sources.aggregators import SourceSpec
+
+    return SourceSpec(source_id=source_id, url="", normalizer=normalizer)
+
+
 def _record_from_row(row: dict) -> ScoutRecord:
     """Rebuild the record a listing was created from.
 
-    Prefers the stored columns over `raw_record`: the raw payload is per-feed
-    and already normalized once, so re-normalizing it would duplicate work and
-    risk drifting from what the row actually says.
+    Re-runs the source's own normalizer over the stored feed payload. Rebuilding
+    from columns alone lost anything the normalizer derived but did not store as
+    a column - most importantly `role_type`, which is how every plain-titled
+    full-time role ("Data Engineer") was silently downgraded to "unknown" the
+    first time anyone ran reclassify.
+
+    Falls back to the columns when there is no payload or no normalizer.
     """
+    spec = _spec_for(row["source_id"])
+    raw = row.get("raw_record") or {}
+    if spec is not None and raw:
+        try:
+            record = spec.normalizer(raw, row["source_id"])
+        except Exception:  # noqa: BLE001 - fall back to columns below
+            record = None
+        if record is not None:
+            if record.role_type is None and spec.role_type:
+                record = replace(record, role_type=spec.role_type)
+            return record
+
     return ScoutRecord(
         source_id=row["source_id"],
         external_id=row["external_id"],
@@ -46,7 +79,8 @@ def _record_from_row(row: dict) -> ScoutRecord:
         date_posted=row.get("date_posted"),
         date_updated=row.get("date_updated"),
         active=bool(row.get("active", True)),
-        raw=row.get("raw_record") or {},
+        role_type=spec.role_type if spec is not None else None,
+        raw=raw,
     )
 
 
@@ -56,7 +90,7 @@ async def reclassify_all() -> dict[str, int]:
     taxonomy = load_taxonomy()
     horizon = prefs.horizon()
 
-    scanned = relabelled = failed = 0
+    scanned = relabelled = role_changed = failed = 0
     offset = 0
 
     while True:
@@ -102,5 +136,12 @@ async def reclassify_all() -> dict[str, int]:
             await database.db.set_labels(row["listing_id"], after)
             if changed:
                 relabelled += 1
+            if verdict.role_type != row.get("role_type"):
+                role_changed += 1
 
-    return {"scanned": scanned, "relabelled": relabelled, "failed": failed}
+    return {
+        "scanned": scanned,
+        "relabelled": relabelled,
+        "role_changed": role_changed,
+        "failed": failed,
+    }

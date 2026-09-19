@@ -15,7 +15,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 import httpx
@@ -55,11 +55,25 @@ class SourceSpec:
     enabled_by_default: bool = True
     # Attribution / licensing note, surfaced in the sources view.
     note: str = ""
+    # Offset pagination for search APIs that cap a page (Himalayas returns ~20
+    # of 65). Without it a single fetch silently reports a fraction of the
+    # results as if it were all of them.
+    page_param: str | None = None
+    # "offset" passes the number of records already read; "page" passes a
+    # 1-based page number. Himalayas silently ignores `offset` and returns page
+    # one for every value, so getting this wrong looks like success.
+    page_style: str = "offset"
+    max_pages: int = 1
+    # What kind of list this is, when the feed itself does not say per record.
+    # An internship list's "Associate Product Manager" is an internship posting;
+    # without this, the title's "manager" read as a senior full-time role.
+    role_type: str | None = None
 
 
 SOURCES: tuple[SourceSpec, ...] = (
     SourceSpec(
         source_id="simplify_intern",
+        role_type="internship",
         url=(
             "https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/"
             "dev/.github/scripts/listings.json"
@@ -72,6 +86,7 @@ SOURCES: tuple[SourceSpec, ...] = (
     ),
     SourceSpec(
         source_id="vansh_intern",
+        role_type="internship",
         url=(
             "https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/"
             "dev/.github/scripts/listings.json"
@@ -81,6 +96,7 @@ SOURCES: tuple[SourceSpec, ...] = (
     ),
     SourceSpec(
         source_id="zshah_intern",
+        role_type="internship",
         url=(
             "https://zshah101.github.io/"
             "Automated-List-Of-Summer-2027-and-Fall-2026-Tech-Internships/api/jobs.json"
@@ -91,6 +107,7 @@ SOURCES: tuple[SourceSpec, ...] = (
     ),
     SourceSpec(
         source_id="applyguy_intern",
+        role_type="internship",
         url="https://raw.githubusercontent.com/ApplyGuy/2027-Internships/main/data/internships.json",
         normalizer=normalize_applyguy,
         root_key="jobs",
@@ -98,6 +115,7 @@ SOURCES: tuple[SourceSpec, ...] = (
     ),
     SourceSpec(
         source_id="simplify_newgrad",
+        role_type="new_grad",
         url=(
             "https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/"
             "dev/.github/scripts/listings.json"
@@ -161,6 +179,58 @@ async def fetch_source(
     Never raises: every failure is reported as ``status="error"`` so one dead
     source cannot abort a run.
     """
+    if spec.page_param and spec.max_pages > 1:
+        return await _fetch_paginated(spec, client=client)
+    return await _fetch_one(spec, client=client, etag=etag, last_modified=last_modified)
+
+
+async def _fetch_paginated(spec: SourceSpec, *, client: httpx.AsyncClient) -> FetchResult:
+    """Walk offset pages until one comes back empty or adds nothing new.
+
+    Each page goes through `_fetch_one`, so retries and error handling are the
+    same as for any other feed. A failure on page one is a failed source; a
+    failure after that keeps what was already read rather than discarding it.
+    """
+    records: list[ScoutRecord] = []
+    seen: set[str] = set()
+    raw_total = 0
+    joiner = "&" if "?" in spec.url else "?"
+
+    for page in range(spec.max_pages):
+        value = page + 1 if spec.page_style == "page" else len(seen)
+        page_spec = replace(
+            spec,
+            url=f"{spec.url}{joiner}{spec.page_param}={value}" if page else spec.url,
+            page_param=None,
+            max_pages=1,
+        )
+        result = await _fetch_one(page_spec, client=client)
+        if result.status != "ok":
+            if page == 0:
+                return result
+            logger.warning("%s: page %d failed, keeping %d records", spec.source_id, page, len(records))
+            break
+        raw_total += result.raw_count
+        fresh = [r for r in result.records if r.external_id not in seen]
+        if not fresh:
+            break
+        for record in fresh:
+            seen.add(record.external_id)
+            records.append(record)
+        await asyncio.sleep(INTER_REQUEST_DELAY_SECONDS)
+
+    return FetchResult(
+        source_id=spec.source_id, status="ok", records=records, raw_count=raw_total
+    )
+
+
+async def _fetch_one(
+    spec: SourceSpec,
+    *,
+    client: httpx.AsyncClient,
+    etag: str | None = None,
+    last_modified: str | None = None,
+) -> FetchResult:
     headers: dict[str, str] = {}
     if etag:
         headers["If-None-Match"] = etag
@@ -216,6 +286,12 @@ async def fetch_source(
                     for item in raw_records
                     if (record := spec.normalizer(item, spec.source_id)) is not None
                 ]
+                if spec.role_type:
+                    # ScoutRecord is frozen; stamp by copying.
+                    records = [
+                        r if r.role_type else replace(r, role_type=spec.role_type)
+                        for r in records
+                    ]
                 return FetchResult(
                     source_id=spec.source_id,
                     status="ok",

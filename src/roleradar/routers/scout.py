@@ -160,9 +160,15 @@ async def list_sources() -> list[SourceResponse]:
     Showing only rows that exist would hide a feed that has silently failed
     since day one, which is the case worth surfacing most.
     """
+    from roleradar.scout.sources.search import search_specs
+
     stored = {row["source_id"]: row for row in await db.list_sources()}
+    specs = dict(SOURCES_BY_ID)
+    specs.update(
+        {s.source_id: s for s in search_specs(load_prefs(), load_taxonomy())}
+    )
     out: list[SourceResponse] = []
-    for source_id, spec in SOURCES_BY_ID.items():
+    for source_id, spec in specs.items():
         row = stored.get(source_id, {})
         out.append(
             SourceResponse(

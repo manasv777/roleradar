@@ -130,7 +130,11 @@ async def _phase_fetch_and_store(state: RunState) -> None:
     totals = UpsertStats()
 
     async with build_client() as client:
-        for index, spec in enumerate(SOURCES):
+        # Full-time search feeds are built from preferences each run, so turning
+        # the option on or changing the searches takes effect without a restart.
+        from roleradar.scout.sources.search import search_specs
+
+        for index, spec in enumerate([*SOURCES, *search_specs(prefs, taxonomy)]):
             stored = source_state.get(spec.source_id) or {}
             if stored.get("enabled") is False or (
                 not stored and not spec.enabled_by_default

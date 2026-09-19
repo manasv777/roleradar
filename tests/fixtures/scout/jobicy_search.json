@@ -1,0 +1,93 @@
+{
+ "success": true,
+ "jobs": [
+  {
+   "id": 153638,
+   "url": "https://jobicy.com/jobs/153638-data-engineer-fedd024",
+   "jobSlug": "153638-data-engineer-fedd024",
+   "jobTitle": "Data Engineer (FedD024)",
+   "companyName": "Defense Unicorns",
+   "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/06/44a44784-221-1.png",
+   "jobIndustry": [
+    "Data Science & Analytics"
+   ],
+   "jobType": [
+    "Full-Time"
+   ],
+   "jobGeo": "USA",
+   "jobLevel": "Any",
+   "jobExcerpt": "EMPLOYER IS A CONTRACTOR FOR THE U.S. GOVERNMENT. THIS POSITION WILL REQUIRE U.S. CITIZENSHIP. Responsibilities: Designing data workflows, pipelines, and pathways to support ETL/ELT, while ensuring data-quality and exchange of sensitive information across AWS cloud and on-prem environments. Implementing systems engineering principles to ensure the reliability, scalability, and maintainability of d",
+   "jobDescription": "<h3><strong>EMPLOYER IS A CONTRACTOR FOR THE U.S. GOVERNMENT. THIS POSITION WILL REQUIRE U.S. CITIZENSHIP.</strong></h3>\n<h3><strong>Responsibilities:</strong></h3>\n<ul>\n<li>Designing data workflows, pipelines, and pathways to support ETL/ELT, while ensuring data-quality and exchange of sensitive information across AWS cloud and on-prem environments. </li>\n<li>Implementing systems engineering prin",
+   "pubDate": "2026-09-19T12:39:52+00:00",
+   "salaryMin": 148750,
+   "salaryMax": 201250,
+   "salaryCurrency": "USD",
+   "salaryPeriod": "yearly"
+  },
+  {
+   "id": 153597,
+   "url": "https://jobicy.com/jobs/153597-sr-data-engineer-3",
+   "jobSlug": "153597-sr-data-engineer-3",
+   "jobTitle": "Sr. Data Engineer",
+   "companyName": "Carrot",
+   "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2021/07/005d05de29487ec44cd07bd9d757d4e1.png",
+   "jobIndustry": [
+    "Data Science & Analytics"
+   ],
+   "jobType": [
+    "Full-Time"
+   ],
+   "jobGeo": "USA",
+   "jobLevel": "Director",
+   "jobExcerpt": "About Carrot: Carrot is the leading global fertility and family care platform, built on intelligent care orchestration: the right clinical guidance, at the right moment, in the context of each member\u2019s life. More than a thousand multinational employers, health plans, and health systems trust Carrot to support millions of members across 195 countries \u2013 from&hellip;",
+   "jobDescription": "<p><strong>About Carrot: </strong></p>\r\n<p><a href=\"https://c212.net/c/link/?t=0&#038;l=en&#038;o=4420559-1&#038;h=3535232987&#038;u=https%3A%2F%2Fwww.carrotfertility.com%2F&#038;a=Carrot+Fertility\" rel=\"nofollow ugc noopener\" target=\"_blank\">Carrot</a> is the leading global fertility and family care platform, built on intelligent care orchestration: the right clinical guidance, at the right momen",
+   "pubDate": "2026-09-18T14:40:03+00:00",
+   "salaryMin": 145000,
+   "salaryMax": 165000,
+   "salaryCurrency": "USD",
+   "salaryPeriod": "yearly"
+  },
+  {
+   "id": 150836,
+   "url": "https://jobicy.com/jobs/150836-data-engineer",
+   "jobSlug": "150836-data-engineer",
+   "jobTitle": "Data Engineer",
+   "companyName": "Gopuff",
+   "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2021/05/Jobicy-210510095548-598926.jpg",
+   "jobIndustry": [
+    "Data Science & Analytics"
+   ],
+   "jobType": [
+    "Full-Time"
+   ],
+   "jobGeo": "USA",
+   "jobLevel": "Any",
+   "jobExcerpt": "At Gopuff, data sits at the heart of our strategy. We are reimagining how people purchase everyday essentials, from snacks to household goods to alcohol, all delivered in minutes. To fuel this mission, we are seeking a Data Engineer to design, build, and scale the data systems that power insights, experimentation, and operational excellence across&hellip;",
+   "jobDescription": "<p>At Gopuff, data sits at the heart of our strategy. We are reimagining how people purchase everyday essentials, from snacks to household goods to alcohol, all delivered in minutes. To fuel this mission, we are seeking a<strong> Data Engineer</strong> to design, build, and scale the data systems that power insights, experimentation, and operational excellence across the company.</p>\n<p>As a Data ",
+   "pubDate": "2026-09-16T04:40:07+00:00",
+   "salaryMin": 118000,
+   "salaryMax": 148000,
+   "salaryCurrency": "USD",
+   "salaryPeriod": "yearly"
+  },
+  {
+   "id": 150666,
+   "url": "https://jobicy.com/jobs/150666-data-engineer-product-analytics",
+   "jobSlug": "150666-data-engineer-product-analytics",
+   "jobTitle": "Data Engineer, Product Analytics",
+   "companyName": "Meta",
+   "companyLogo": "https://jobicy.com/data/server-nyc0409/galaxy/mercury/2025/06/750f86a9-221.jpeg",
+   "jobIndustry": [
+    "Data Science & Analytics"
+   ],
+   "jobType": [
+    "Full-Time"
+   ],
+   "jobGeo": "USA",
+   "jobLevel": "Senior",
+   "jobExcerpt": "As a Data Engineer at Meta, you will shape the future of people-facing and business-facing products we build across our entire family of applications (Facebook, Instagram, Messenger, WhatsApp, Reality Labs, Threads). Your technical skills and analytical mindset will be utilized designing and building some of the world's most extensive data sets, helping to craft experiences&hellip;",
+   "jobDescription": "<p>As a Data Engineer at Meta, you will shape the future of people-facing and business-facing products we build across our entire family of applications (Facebook, Instagram, Messenger, WhatsApp, Reality Labs, Threads). Your technical skills and analytical mindset will be utilized designing and building some of the world's most extensive data sets, helping to craft experiences for billions of peop",
+   "pubDate": "2026-09-15T04:40:15+00:00"
+  }
+ ]
+}

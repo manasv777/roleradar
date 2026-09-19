@@ -112,6 +112,33 @@ refetching anything**, because every row keeps the feed record it came from.
 That is also why roleradar stores listings it cannot label rather than dropping
 them: a discarded row cannot be reclassified later.
 
+## Full-time roles
+
+The GitHub lists roleradar reads are internship and new-grad lists, so they
+carry almost no full-time roles. Turning full-time roles on adds two job-board
+search APIs — [Himalayas](https://himalayas.app) and [Jobicy](https://jobicy.com)
+— queried with your own search terms:
+
+```json
+{
+  "role_types": ["internship", "new_grad", "full_time"],
+  "full_time": { "searches": ["data engineer", "hadoop developer"] }
+}
+```
+
+Leave `searches` empty and roleradar derives them from the fields you picked —
+choosing *Data Engineering* searches for data engineering. `roleradar init` asks
+about this too. Then pick **Full-time** in the Role filter.
+
+Limits worth knowing:
+
+- Both boards list **remote roles only**.
+- Himalayas returns about 20 results a page; roleradar reads up to five pages
+  per search. **Jobicy returns at most the 50 most recent** per search and has
+  no pagination.
+- Removing a search stops fetching it, but listings it already found stay
+  until you dismiss them — nothing re-checks a search you no longer run.
+
 ## Terms
 
 Seasons are computed from the calendar, never hardcoded. `roleradar prefs` shows

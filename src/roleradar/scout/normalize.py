@@ -40,6 +40,10 @@ class ScoutRecord:
     active: bool = True
     date_posted: str | None = None
     date_updated: str | None = None
+    # internship | new_grad | full_time, when the feed itself says so. The
+    # classifier reads this before guessing from the title; it existed as a
+    # getattr() probe with no field behind it, so no feed could ever set it.
+    role_type: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -384,5 +388,114 @@ def normalize_applyguy(record: dict[str, Any], source_id: str) -> ScoutRecord | 
         active=True,  # this feed only publishes open roles
         date_posted=(str(record["posted"]) if record.get("posted") else None),
         date_updated=(str(record["posted"]) if record.get("posted") else None),
+        raw=record,
+    )
+
+
+# --- full-time search feeds ------------------------------------------------
+#
+# Unlike the GitHub lists above, these are search APIs over general job boards,
+# queried with the user's own search terms. They carry full-time roles, which no
+# internship list does.
+
+_INTERN_TITLE_RE = re.compile(r"\b(intern(ship)?s?|co[- ]?op)\b", re.IGNORECASE)
+_ENTRY_RE = re.compile(r"\b(entry[- ]level|junior|new ?grad|graduate)\b", re.IGNORECASE)
+
+
+def _as_list(value: Any) -> list[str]:
+    """These feeds encode lists as Python-repr strings: "['Senior', 'Mid-level']"."""
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    if isinstance(value, str):
+        text = value.strip()
+        if text.startswith("[") and text.endswith("]"):
+            return [p.strip(" '\"") for p in text[1:-1].split(",") if p.strip(" '\"")]
+        return [text] if text else []
+    return []
+
+
+def _employment_role(title: str, employment: str, level: str) -> str:
+    """Decide a search result's role type. An intern title beats the feed's own
+    employment type, because job boards mark many internships "Full Time"."""
+    if _INTERN_TITLE_RE.search(title) or "intern" in employment.lower():
+        return "internship"
+    if _ENTRY_RE.search(level) or _ENTRY_RE.search(title):
+        return "new_grad"
+    return "full_time"
+
+
+def _epoch_or_iso(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc).isoformat()
+    except (TypeError, ValueError, OSError):
+        return str(value)
+
+
+def normalize_himalayas(record: dict[str, Any], source_id: str) -> ScoutRecord | None:
+    title = (record.get("title") or "").strip()
+    url = record.get("applicationLink") or record.get("guid")
+    if not title or not url:
+        return None
+
+    expiry = record.get("expiryDate")
+    active = True
+    if expiry:
+        try:
+            active = int(expiry) > int(datetime.now(timezone.utc).timestamp())
+        except (TypeError, ValueError):
+            pass
+
+    categories = _as_list(record.get("categories"))
+    return ScoutRecord(
+        source_id=source_id,
+        external_id=str(record.get("guid") or url),
+        company=(record.get("companyName") or "").strip(),
+        title=title,
+        apply_url=url,
+        company_url=(
+            f"https://himalayas.app/companies/{record['companySlug']}"
+            if record.get("companySlug") else None
+        ),
+        locations=_as_list(record.get("locationRestrictions")) or ["Remote"],
+        # Hyphenated slugs ("Data-Engineering") would never match the
+        # taxonomy's feed_categories exactly.
+        category=categories[0].replace("-", " ").lower() if categories else None,
+        is_remote=True,
+        active=active,
+        date_posted=_epoch_or_iso(record.get("pubDate")),
+        role_type=_employment_role(
+            title,
+            str(record.get("employmentType") or ""),
+            " ".join(_as_list(record.get("seniority"))),
+        ),
+        raw=record,
+    )
+
+
+def normalize_jobicy(record: dict[str, Any], source_id: str) -> ScoutRecord | None:
+    title = (record.get("jobTitle") or "").strip()
+    # Jobicy's terms: application links must go to the URL the feed provides.
+    url = record.get("url")
+    if not title or not url:
+        return None
+    industries = _as_list(record.get("jobIndustry"))
+    return ScoutRecord(
+        source_id=source_id,
+        external_id=str(record.get("id") or url),
+        company=(record.get("companyName") or "").strip(),
+        title=title,
+        apply_url=url,
+        company_url="https://jobicy.com",  # their terms ask for a credit link
+        locations=[record.get("jobGeo")] if record.get("jobGeo") else ["Remote"],
+        category=industries[0].lower() if industries else None,
+        is_remote=True,
+        date_posted=record.get("pubDate"),
+        role_type=_employment_role(
+            title,
+            " ".join(_as_list(record.get("jobType"))),
+            str(record.get("jobLevel") or ""),
+        ),
         raw=record,
     )

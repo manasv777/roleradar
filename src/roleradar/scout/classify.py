@@ -30,6 +30,7 @@ from roleradar.terms import Term, resolve_term
 
 ROLE_INTERNSHIP = "internship"
 ROLE_NEW_GRAD = "new_grad"
+ROLE_FULL_TIME = "full_time"
 ROLE_UNKNOWN = "unknown"
 
 @dataclass
@@ -88,7 +89,7 @@ def classify_role_type(
     """Decide whether a listing is an internship, a new-grad role, or neither."""
     title = title or ""
 
-    if source_role_type in (ROLE_INTERNSHIP, ROLE_NEW_GRAD):
+    if source_role_type in (ROLE_INTERNSHIP, ROLE_NEW_GRAD, ROLE_FULL_TIME):
         return source_role_type, [f"source declares {source_role_type}"]
 
     if _INTERNSHIP_RE.search(title):
@@ -96,7 +97,10 @@ def classify_role_type(
     if _NEW_GRAD_RE.search(title):
         return ROLE_NEW_GRAD, ["title names a new-grad or entry-level role"]
     if _SENIOR_RE.search(title):
-        return ROLE_UNKNOWN, ["title reads as a senior role"]
+        # A senior title is a full-time role, not an unknown one. It used to be
+        # filed as unknown because the tool only served early-career searches;
+        # with full-time roles selectable, calling it unknown hides it.
+        return ROLE_FULL_TIME, ["title reads as a senior full-time role"]
     if has_term:
         return ROLE_INTERNSHIP, ["carries an academic term, so treated as an internship"]
     return ROLE_UNKNOWN, ["no role-type signal in the title"]

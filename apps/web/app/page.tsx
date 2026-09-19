@@ -138,6 +138,7 @@ export default function Home() {
             <option value="">Any</option>
             <option value="internship">Internship</option>
             <option value="new_grad">New grad</option>
+            <option value="full_time">Full-time</option>
           </select>
         </label>
 

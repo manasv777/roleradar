@@ -1,0 +1,184 @@
+{
+ "offset": 0,
+ "limit": 20,
+ "totalCount": 65,
+ "jobs": [
+  {
+   "title": "Big Data Application Developer",
+   "excerpt": "Big Data Application Developer - Remote Bright Vision Technologies is a technology consulting and software development company delivering cloud, AI, data, and enterprise solutions across the United States.",
+   "companyName": "Bright Vision Technologies",
+   "companySlug": "bright-vision-technologies",
+   "companyLogo": "https://cdn-images.himalayas.app/tillsehd3opuq2p5lraeki82dq3v",
+   "employmentType": "Full Time",
+   "minSalary": 100000,
+   "maxSalary": 150000,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": "USD",
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -10,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    14
+   ],
+   "categories": [
+    "Big-Data-Development",
+    "Data-Engineering",
+    "Hadoop-Developer",
+    "Data-Pipeline-Engineer",
+    "Software-Engineer",
+    "Big-Data-Application-Developer",
+    "Big-Data-Developer",
+    "Data-Application-Developer",
+    "Hadoop-Big-Data-Developer",
+    "Big-Data-Engineer",
+    "Java-Big-Data-Engineer"
+   ],
+   "parentCategories": [
+    "Developer"
+   ],
+   "description": "<strong>Big Data Application Developer - Remote </strong><br><br><a href=\"https://himalayas.app/companies/bright-vision-technologies\">Bright Vision Technologies</a> is a technology consulting and software development company delivering cloud, AI, data, and enterprise solutions across the United States. <br><br>This is a fantastic opportunity to join an established and well-respected organization o",
+   "pubDate": 1786927292,
+   "expiryDate": 1792111291,
+   "applicationLink": "https://himalayas.app/companies/bright-vision-technologies/jobs/big-data-application-developer-5940390521",
+   "guid": "https://himalayas.app/companies/bright-vision-technologies/jobs/big-data-application-developer-5940390521"
+  },
+  {
+   "title": "Big Data Developer",
+   "excerpt": "L3 Big datadeveloper ( 7-10 Years)1.  Design, develop, and implement highly scalable and distributed big datasolutions using Hadoop ecosystem technologies such as HBase, Hive, Kudu, andSpark.",
+   "companyName": "PradeepIT Consulting Services Pvt Ltd",
+   "companySlug": "pradeepit-consulting-services-pvt-ltd",
+   "companyLogo": "https://cdn-images.himalayas.app/6fab62ojb6wkuftxpvkflmbcqakl",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "India"
+   ],
+   "timezoneRestrictions": [
+    5.5
+   ],
+   "categories": [
+    "Big-Data-Developer",
+    "Big-Data-Engineer",
+    "Data-Engineer",
+    "Spark-Developer",
+    "Hadoop-Developer",
+    "Hadoop-Big-Data-Developer",
+    "Big-Data-Architect",
+    "Java-Big-Data-Engineer"
+   ],
+   "parentCategories": [
+    "Data Science",
+    "Developer"
+   ],
+   "description": "<h3>L3 Big datadeveloper ( 7-10 Years)</h3><p>1. Design, develop, and implement highly scalable and distributed big datasolutions using Hadoop ecosystem technologies such as HBase, Hive, Kudu, andSpark.<br>2. Architect HBase schemas and data models to accommodate evolving businessrequirements and ensure optimal performance for data storage and retrievaloperations.<br>3. Develop complex Hive querie",
+   "pubDate": 1787949092,
+   "expiryDate": 1790397312,
+   "applicationLink": "https://himalayas.app/companies/pradeepit-consulting-services-pvt-ltd/jobs/big-data-developer",
+   "guid": "https://himalayas.app/companies/pradeepit-consulting-services-pvt-ltd/jobs/big-data-developer"
+  },
+  {
+   "title": "Bigdata Engineer -Spark",
+   "excerpt": "Category: Technology Location: Responsibilities: \u2022 As a developer, possess excellent Knowledge of distributed computing architecture, core hadoop component (HDFS, Spark, Yarn, Map-Reduce, H base, HIVE, Impala) and related technologies.",
+   "companyName": "Marktine Technology Solutions Pvt Ltd",
+   "companySlug": "marktine-technology-solutions-pvt-ltd",
+   "companyLogo": "https://cdn-images.himalayas.app/quqgw04d646fm1iauh9c3v3t4e3r",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Mid-level"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "United States"
+   ],
+   "timezoneRestrictions": [
+    -10,
+    -9,
+    -8,
+    -7,
+    -6,
+    -5,
+    14
+   ],
+   "categories": [
+    "Big-Data-Engineering",
+    "Data-Engineering",
+    "Data-Warehouse",
+    "Hadoop-Development",
+    "Spark-Development",
+    "Big-Data-Engineer",
+    "Apache-Spark-Developer",
+    "Big-Data-Developer"
+   ],
+   "parentCategories": [],
+   "description": "Category: Technology <br><br>Location: <br><br><br><div>Responsibilities:<br>\n</div><ul>\n<li>As a developer, possess excellent Knowledge of distributed computing architecture, core hadoop component (HDFS, Spark, Yarn, Map-Reduce, H base, HIVE, Impala) and related technologies.<br>\n</li>\n<li>Technical Design and development of ETL/Hadoop and Analytics services /components<br>\n</li>\n<li>Contribute i",
+   "pubDate": 1789677417,
+   "expiryDate": 1792175189,
+   "applicationLink": "https://himalayas.app/companies/marktine-technology-solutions-pvt-ltd/jobs/bigdata-engineer-spark",
+   "guid": "https://himalayas.app/companies/marktine-technology-solutions-pvt-ltd/jobs/bigdata-engineer-spark"
+  },
+  {
+   "title": "Big Data Developer",
+   "excerpt": "Join our expanding development teams as we seek a skilled Big Data Developer to drive innovation and excellence and work on large international projects.",
+   "companyName": "EUROPEAN DYNAMICS",
+   "companySlug": "european-dynamics",
+   "companyLogo": "https://cdn-images.himalayas.app/fuoymd6w6l0yk5f0nvipf7zkxios",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Senior"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "Greece"
+   ],
+   "timezoneRestrictions": [
+    2
+   ],
+   "categories": [
+    "Big-Data-Development",
+    "Data-Engineering",
+    "Java-Development",
+    "Python-Development",
+    "Software-Development",
+    "Big-Data-Developer",
+    "Big-Data-Engineer",
+    "Big-Data-Architect",
+    "Java-Big-Data-Engineer",
+    "BigQuery-Developer",
+    "Data-Developer",
+    "Big-Data-Jobs",
+    "Big-Data-Consultant",
+    "Hadoop-Developer",
+    "Developer"
+   ],
+   "parentCategories": [
+    "Developer"
+   ],
+   "description": "<p>Join our expanding development teams as we seek a skilled <strong>Big Data Developer</strong> to drive innovation and excellence and work on large international projects. Collaborate with our dynamic software implementation and maintenance teams on both new development projects and existing system enhancements.</p><p><strong>What You'll Do:</strong></p><ul><li><strong>The Big Data Developer wil",
+   "pubDate": 1787430662,
+   "expiryDate": 1789869209,
+   "applicationLink": "https://himalayas.app/companies/european-dynamics/jobs/big-data-developer-6819253099",
+   "guid": "https://himalayas.app/companies/european-dynamics/jobs/big-data-developer-6819253099"
+  }
+ ]
+}

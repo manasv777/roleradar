@@ -49,6 +49,10 @@ class Preferences:
     # domain id -> specialty ids. An empty list means "the whole domain".
     interests: dict[str, list[str]] = field(default_factory=dict)
     role_types: list[str] = field(default_factory=lambda: ["internship", "new_grad"])
+    # Search terms for full-time roles, used only when role_types includes
+    # "full_time". Empty means "derive them from my chosen fields" - a fixed
+    # default here would be one person's job search shipped to everyone.
+    full_time_searches: list[str] = field(default_factory=list)
     term_mode: str = "auto"                     # auto | explicit
     horizon_months: int = 18
     explicit_terms: list[str] = field(default_factory=list)
@@ -120,6 +124,7 @@ class Preferences:
             "version": self.version,
             "interests": self.interests,
             "role_types": self.role_types,
+            "full_time": {"searches": self.full_time_searches},
             "terms": {
                 "mode": self.term_mode,
                 "horizon_months": self.horizon_months,
@@ -160,6 +165,11 @@ class Preferences:
             version=int(raw.get("version", PREFERENCES_VERSION)),
             interests=dict(raw.get("interests") or {}),
             role_types=list(raw.get("role_types") or ["internship", "new_grad"]),
+            full_time_searches=[
+                str(q).strip()
+                for q in ((raw.get("full_time") or {}).get("searches") or [])
+                if str(q).strip()
+            ],
             term_mode=terms.get("mode", "auto"),
             horizon_months=int(terms.get("horizon_months", 18)),
             explicit_terms=list(terms.get("explicit") or []),

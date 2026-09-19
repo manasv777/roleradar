@@ -8,7 +8,7 @@
 
 const BASE = '/api/v1';
 
-export type RoleType = 'internship' | 'new_grad' | 'unknown';
+export type RoleType = 'internship' | 'new_grad' | 'full_time' | 'unknown';
 
 export interface Term {
   id: string;

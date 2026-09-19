@@ -98,6 +98,19 @@ def cmd_init(args: argparse.Namespace) -> int:
     if _yes("Include new-grad roles?"):
         role_types.append("new_grad")
 
+    full_time_searches: list[str] = []
+    if _yes("Include full-time roles too?", default=False):
+        role_types.append("full_time")
+        from roleradar.prefs import Preferences as _P
+        from roleradar.scout.sources.search import search_queries
+
+        suggested = search_queries(_P(interests=interests), taxonomy)
+        raw = _ask(
+            "Full-time searches (comma-separated, e.g. data engineer, hadoop developer)",
+            ", ".join(suggested),
+        )
+        full_time_searches = [q.strip() for q in raw.split(",") if q.strip()]
+
     needs_sponsorship = _yes("\nDo you need visa sponsorship?", default=False)
 
     # Seeded from the chosen specialties so nobody stares at a blank prompt.
@@ -111,6 +124,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     prefs = Preferences(
         interests=interests,
         role_types=role_types or ["internship", "new_grad"],
+        full_time_searches=full_time_searches,
         work_auth=WorkAuth(requires_sponsorship=needs_sponsorship),
         skills=[s.strip() for s in skills_raw.split(",") if s.strip()],
     )
@@ -157,9 +171,10 @@ def cmd_run(args: argparse.Namespace) -> int:
 # --- sources ---------------------------------------------------------------
 def cmd_sources(args: argparse.Namespace) -> int:
     from roleradar.scout.sources import SOURCES
+    from roleradar.scout.sources.search import search_specs
 
     failures = 0
-    for spec in SOURCES:
+    for spec in [*SOURCES, *search_specs(load_prefs(), load_taxonomy())]:
         try:
             response = httpx.head(spec.url, timeout=20.0, follow_redirects=True)
             if response.status_code >= 400:
@@ -171,7 +186,7 @@ def cmd_sources(args: argparse.Namespace) -> int:
             ok, status = False, str(exc)[:60]
         if not ok:
             failures += 1
-        print(f"  {'ok  ' if ok else 'FAIL'} {spec.source_id:20s} {status}")
+        print(f"  {'ok  ' if ok else 'FAIL'} {spec.source_id:32s} {status}")
 
     # Season-named repos get renamed or archived every year; a feed that 404s
     # silently looks to a new user like the whole tool is broken.
