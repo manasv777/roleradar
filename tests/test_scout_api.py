@@ -137,12 +137,8 @@ class TestConfigEndpoints:
         assert body["version"] >= 1
         assert any(d["specialties"] for d in body["domains"])
 
-    async def test_preferences_round_trip(self, client, tmp_path, monkeypatch) -> None:
-        import roleradar.prefs as prefs_mod
-
-        monkeypatch.setattr(
-            prefs_mod, "save_prefs", lambda p, path=None: tmp_path / "p.json"
-        )
+    async def test_preferences_round_trip(self, client) -> None:
+        """Writes for real - isolated_home redirects it away from the user's file."""
         payload = {"interests": {"software": ["backend"]}, "skills": ["python"]}
         response = await client.put(f"{BASE}/preferences", json=payload)
         assert response.status_code == 200

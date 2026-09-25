@@ -58,6 +58,10 @@ class Preferences:
     explicit_terms: list[str] = field(default_factory=list)
     work_auth: WorkAuth = field(default_factory=WorkAuth)
     locations: list[str] = field(default_factory=list)
+    # Keep only roles located in the US. Off by default - roleradar should not
+    # assume anybody's country - and honoured by the search feeds, which are
+    # worldwide remote boards.
+    us_only: bool = False
     exclude_countries: list[str] = field(default_factory=list)
     skills: list[str] = field(default_factory=list)
     highlights: list[str] = field(default_factory=list)
@@ -134,6 +138,7 @@ class Preferences:
             "locations": {
                 "preferred": self.locations,
                 "exclude_countries": self.exclude_countries,
+                "us_only": self.us_only,
             },
             "skills": self.skills,
             "highlights": self.highlights,
@@ -179,6 +184,7 @@ class Preferences:
             ),
             locations=list(locations.get("preferred") or []),
             exclude_countries=list(locations.get("exclude_countries") or []),
+            us_only=bool(locations.get("us_only", False)),
             skills=list(raw.get("skills") or []),
             highlights=list(raw.get("highlights") or []),
             notify_enabled=bool(notify.get("enabled", True)),

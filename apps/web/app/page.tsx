@@ -28,9 +28,16 @@ export default function Home() {
   const [domains, setDomains] = React.useState<Domain[]>([]);
   const [run, setRun] = React.useState<RunState | null>(null);
 
-  const [term, setTerm] = React.useState('');
-  const [roleType, setRoleType] = React.useState('');
-  const [specialty, setSpecialty] = React.useState('');
+  // Filters live in the URL. Without this the page gave no way to confirm what
+  // was actually filtered: leaving Role on "Any" while picking a field shows
+  // that field's internships, which reads exactly like the filter being ignored.
+  const initial =
+    typeof window === 'undefined'
+      ? new URLSearchParams()
+      : new URLSearchParams(window.location.search);
+  const [term, setTerm] = React.useState(initial.get('term') ?? '');
+  const [roleType, setRoleType] = React.useState(initial.get('role') ?? '');
+  const [specialty, setSpecialty] = React.useState(initial.get('field') ?? '');
   const [page, setPage] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -86,6 +93,36 @@ export default function Home() {
     }, POLL_MS);
     return () => clearInterval(id);
   }, [run, load]);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams();
+    if (term) params.set('term', term);
+    if (roleType) params.set('role', roleType);
+    if (specialty) params.set('field', specialty);
+    if (page) params.set('page', String(page + 1));
+    const query = params.toString();
+    window.history.replaceState(null, '', query ? `?${query}` : window.location.pathname);
+  }, [term, roleType, specialty, page]);
+
+  const termLabels = React.useMemo(
+    () => new Map(terms.map((t) => [t.id, t.label])),
+    [terms]
+  );
+  const specialtyLabels = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const d of domains) for (const s of d.specialties) map.set(s.key, s.label);
+    return map;
+  }, [domains]);
+
+  const activeFilters: Array<[string, string]> = [
+    ...(roleType
+      ? ([['Role', roleType === 'full_time' ? 'Full-time' : roleType.replace('_', ' ')]] as Array<[string, string]>)
+      : []),
+    ...(specialty
+      ? ([['Field', specialtyLabels.get(specialty) ?? specialty]] as Array<[string, string]>)
+      : []),
+    ...(term ? ([['Term', termLabels.get(term) ?? term]] as Array<[string, string]>) : []),
+  ];
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const pageNumbers = React.useMemo(() => {
@@ -155,6 +192,35 @@ export default function Home() {
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="filters" style={{ borderBottom: 'none', paddingBottom: 4 }}>
+        {activeFilters.length === 0 ? (
+          <span className="mono">
+            Showing everything — no filters. Pick Role <strong>Full-time</strong> to
+            exclude internships.
+          </span>
+        ) : (
+          <>
+            <span className="mono">Showing</span>
+            {activeFilters.map(([label, value]) => (
+              <span className="chip mono" key={label}>
+                {label}: {value}
+              </span>
+            ))}
+            <span className="mono">· {total.toLocaleString()} match{total === 1 ? '' : 'es'}</span>
+            <button
+              className="mono"
+              onClick={() => {
+                setRoleType('');
+                setSpecialty('');
+                setTerm('');
+              }}
+            >
+              Clear
+            </button>
+          </>
+        )}
       </div>
 
       {error && <div className="banner"><strong>Could not load listings.</strong> {error}</div>}

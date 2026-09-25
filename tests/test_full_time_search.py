@@ -156,3 +156,50 @@ class TestReclassifyKeepsRoleType:
 
         assert SOURCES_BY_ID["simplify_intern"].role_type == "internship"
         assert SOURCES_BY_ID["simplify_newgrad"].role_type == "new_grad"
+
+
+class TestUsOnly:
+    """The search feeds are worldwide remote boards; "data engineer" otherwise
+    returns Argentina and Bulgaria alongside the US roles."""
+
+    def test_off_by_default(self) -> None:
+        prefs = Preferences(role_types=["full_time"], full_time_searches=["data engineer"])
+        specs = search_specs(prefs, TAXONOMY)
+        assert all(not s.require_us for s in specs)
+        assert all("geo=usa" not in s.url and "country=" not in s.url for s in specs)
+
+    def test_each_board_is_asked_for_us_roles(self) -> None:
+        prefs = Preferences(
+            role_types=["full_time"], full_time_searches=["data engineer"], us_only=True
+        )
+        urls = {s.source_id.split(":")[0]: s.url for s in search_specs(prefs, TAXONOMY)}
+        assert "geo=usa" in urls["jobicy"]           # Jobicy filters server-side
+        assert "country=" in urls["himalayas"]       # unreliable, hence the check below
+        assert all(s.require_us for s in search_specs(prefs, TAXONOMY))
+
+    @respx.mock
+    async def test_non_us_records_are_dropped(self, monkeypatch) -> None:
+        import roleradar.scout.sources.aggregators as agg
+
+        monkeypatch.setattr(agg, "INTER_REQUEST_DELAY_SECONDS", 0)
+        base = fixture("himalayas_search")["jobs"][0]
+        jobs = [
+            dict(base, guid="us-1", title="Data Engineer", locationRestrictions="['United States']"),
+            dict(base, guid="ar-1", title="Data Engineer", locationRestrictions="['Argentina']"),
+            dict(base, guid="any-1", title="Data Engineer", locationRestrictions="['Anywhere']"),
+        ]
+        spec = next(
+            s for s in search_specs(
+                Preferences(role_types=["full_time"], full_time_searches=["data engineer"], us_only=True),
+                TAXONOMY,
+            ) if s.source_id.startswith("himalayas")
+        )
+        respx.get(url__startswith="https://himalayas.app/").mock(
+            side_effect=lambda request: httpx.Response(
+                200, json={"jobs": jobs if "page" not in request.url.params else []}
+            )
+        )
+        async with httpx.AsyncClient() as client:
+            result = await fetch_source(spec, client=client)
+
+        assert [r.external_id for r in result.records] == ["us-1"]

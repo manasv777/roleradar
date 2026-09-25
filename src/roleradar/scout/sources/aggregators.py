@@ -64,6 +64,9 @@ class SourceSpec:
     # one for every value, so getting this wrong looks like success.
     page_style: str = "offset"
     max_pages: int = 1
+    # Drop records that are not located in the US. Used by the worldwide remote
+    # boards, where "data engineer" otherwise returns Argentina and Bulgaria.
+    require_us: bool = False
     # What kind of list this is, when the feed itself does not say per record.
     # An internship list's "Associate Product Manager" is an internship posting;
     # without this, the title's "manager" read as a senior full-time role.
@@ -153,6 +156,17 @@ def build_client() -> httpx.AsyncClient:
         follow_redirects=True,
         headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
     )
+
+
+def _is_us_record(record: ScoutRecord) -> bool:
+    """True when at least one location is recognisably in the US.
+
+    Deliberately strict: "Anywhere" and "Remote" do not count. A worldwide
+    board's idea of remote includes roles that cannot be taken from the US.
+    """
+    from roleradar.scout.classify import _location_is_us
+
+    return any(_location_is_us(loc) is True for loc in record.locations)
 
 
 def _parse_payload(text: str, spec: SourceSpec) -> list[dict[str, Any]]:
@@ -286,6 +300,8 @@ async def _fetch_one(
                     for item in raw_records
                     if (record := spec.normalizer(item, spec.source_id)) is not None
                 ]
+                if spec.require_us:
+                    records = [r for r in records if _is_us_record(r)]
                 if spec.role_type:
                     # ScoutRecord is frozen; stamp by copying.
                     records = [

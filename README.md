@@ -122,9 +122,20 @@ search APIs — [Himalayas](https://himalayas.app) and [Jobicy](https://jobicy.c
 ```json
 {
   "role_types": ["internship", "new_grad", "full_time"],
-  "full_time": { "searches": ["data engineer", "hadoop developer"] }
+  "full_time": { "searches": ["data engineer", "hadoop developer"] },
+  "locations": { "us_only": true }
 }
 ```
+
+`us_only` matters most here: these are worldwide remote boards, so a search for
+"data engineer" returns Argentina and Bulgaria next to the US roles. Jobicy
+filters server-side; Himalayas' country parameter is unreliable, so roleradar
+also checks each result's location and drops what is not in the US. It is off by
+default — roleradar should not assume anyone's country.
+
+List as many searches as you like; each one is fetched separately, so
+"data engineer", "etl developer", "big data engineer" and "analytics engineer"
+together cover far more than any single term.
 
 Leave `searches` empty and roleradar derives them from the fields you picked —
 choosing *Data Engineering* searches for data engineering. `roleradar init` asks

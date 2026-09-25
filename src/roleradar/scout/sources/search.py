@@ -63,15 +63,21 @@ def search_specs(prefs: Preferences, taxonomy: Taxonomy) -> list[SourceSpec]:
         return []
 
     specs: list[SourceSpec] = []
+    # Jobicy filters server-side; Himalayas' country parameter is unreliable, so
+    # it is passed as a hint and US membership is enforced on the records.
+    him_geo = "&country=United%20States" if prefs.us_only else ""
+    job_geo = "&geo=usa" if prefs.us_only else ""
+
     for query in search_queries(prefs, taxonomy):
         slug = _slug(query)
         specs.append(
             SourceSpec(
                 source_id=f"himalayas:{slug}",
-                url=f"https://himalayas.app/jobs/api/search?q={quote(query)}",
+                url=f"https://himalayas.app/jobs/api/search?q={quote(query)}{him_geo}",
                 normalizer=normalize_himalayas,
                 root_key="jobs",
                 note=HIMALAYAS_NOTE,
+                require_us=prefs.us_only,
                 page_param="page",
                 page_style="page",
                 max_pages=5,
@@ -80,10 +86,11 @@ def search_specs(prefs: Preferences, taxonomy: Taxonomy) -> list[SourceSpec]:
         specs.append(
             SourceSpec(
                 source_id=f"jobicy:{slug}",
-                url=f"https://jobicy.com/api/v2/remote-jobs?count=50&tag={quote(query)}",
+                url=f"https://jobicy.com/api/v2/remote-jobs?count=50&tag={quote(query)}{job_geo}",
                 normalizer=normalize_jobicy,
                 root_key="jobs",
                 note=JOBICY_NOTE,
+                require_us=prefs.us_only,
             )
         )
     return specs
